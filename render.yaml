@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: gym-manager-api
+    runtime: node
+    plan: free
+    region: oregon
+
+    # Build from the repo root so pnpm workspace packages resolve correctly
+    rootDir: .
+    buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile && pnpm --filter @workspace/api-server run build
+    startCommand: node artifacts/api-server/dist/index.cjs
+
+    # Health check — Render uses this to know the service is up
+    healthCheckPath: /api/healthz
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      # Set these manually in the Render dashboard — do NOT put real values here
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: LICENSE_SECRET
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: ""

@@ -1,0 +1,23 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "include": ["src/**/*", "mockupPreviewPlugin.ts", "vite.config.ts"],
+  "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "jsx": "preserve",
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": true,
+    "skipLibCheck": true,
+    "types": ["node", "vite/client"],
+    "paths": {
+      "@/*": ["./src/*"],
+      // Force TypeScript to resolve @types/react and @types/react-dom to the
+      // single version installed in this package's node_modules, preventing
+      // the "two different types with this name exist" error caused by
+      // @types/react@19.1.x being present in the pnpm store via gym-manager.
+      "react": ["./node_modules/@types/react/index.d.ts"],
+      "react-dom": ["./node_modules/@types/react-dom/index.d.ts"]
+    }
+  }
+}

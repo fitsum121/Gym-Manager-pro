@@ -1,0 +1,256 @@
+
+ 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
+
+
+
+
+Let me explore the workspace structure first.
+
+Here's a thorough analysis of the project:
+
+---
+
+## Project Overview
+
+**Gym Manager Pro** — a pnpm monorepo hosted on Replit, built around a gym membership management system with two main deliverables: a mobile app and a backend API.
+
+---
+
+## Architecture
+
+```
+monorepo/
+├── artifacts/          # Deployable apps
+│   ├── gym-manager/    # Expo React Native mobile app (main product)
+│   ├── api-server/     # Express 5 REST API (license admin backend)
+│   └── mockup-sandbox/ # Vite/React UI sandbox (design/prototyping)
+└── lib/                # Shared packages
+    ├── db/             # Drizzle ORM + PostgreSQL
+    ├── api-spec/       # OpenAPI 3.1 spec + Orval codegen
+    ├── api-client-react/ # Generated React Query hooks
+    └── api-zod/        # Generated Zod validation schemas
+```
+
+---
+
+## The Mobile App (`artifacts/gym-manager`)
+
+The core product. A fully **offline** Expo React Native app for gym owners to manage their members.
+
+**Tech stack:** Expo SDK 54, React Native 0.81, Expo Router v6, React Query, Zod, AsyncStorage, date-fns
+
+**Key features:**
+- Auth (login/register/forgot password) — stored in AsyncStorage, no server
+- Customer CRUD with photo support (camera + gallery)
+- Membership types: weekly, monthly, quarterly, yearly with auto-calculated expiry
+- Payment recording with automatic expiry extension
+- Auto-delete members unpaid for 7+ days on app load
+- Search/filter by active/expired/unpaid status
+- SMS integration (pre-filled messages)
+
+**App screens:**
+- `(auth)/` — login, register, forgot password
+- `(tabs)/` — members list + settings
+- `customer/[id]` — member detail
+- `customer/add` — add member modal
+- `activate` — subscription activation screen
+
+**Subscription/licensing system:**
+- Each gym owner gets a unique 6-char `gymId`
+- Activation codes follow the format `GYM-{GYMID}-{YYMMDD}-{SIG8}`
+- Signature uses a custom double-FNV hash with a shared secret
+- Subscriptions stored locally in AsyncStorage per `gymId`
+
+---
+
+## The API Server (`artifacts/api-server`)
+
+Express 5 server, currently minimal — its main purpose is the **license admin panel**.
+
+**Routes:**
+- `GET /api/healthz` — health check (validated via Zod)
+- `GET /api/admin` — HTML license generator UI (Basic Auth protected)
+- `POST /api/admin/generate-code` — generates activation codes for gym owners
+
+**Notable concern:** Admin credentials (`fitsumgebramariam53@gmail.com` / `F1i2t3s4u5m6@`) are hardcoded in `admin.ts`. This is a security risk — these should be environment variables.
+
+---
+
+## Shared Libraries
+
+- **`lib/db`** — Drizzle ORM setup with PostgreSQL. The schema is currently empty (just a template/placeholder). The DB layer exists but isn't used by the app yet.
+- **`lib/api-spec`** — OpenAPI spec with only a `/healthz` endpoint defined. Orval is configured for codegen.
+- **`lib/api-client-react`** — Generated React Query hooks (from Orval).
+- **`lib/api-zod`** — Generated Zod schemas (from Orval).
+
+---
+
+## Key Observations
+
+**Strengths:**
+- Clean monorepo structure with clear separation of concerns
+- Strong TypeScript config (strict null checks, `noImplicitAny`, etc.)
+- Supply-chain security via `minimumReleaseAge: 1440` in pnpm config
+- The mobile app is feature-complete and self-contained
+
+**Areas to watch:**
+1. **Hardcoded admin credentials** in `admin.ts` — should move to env vars
+2. **Passwords stored in plaintext** in AsyncStorage — no hashing
+3. **DB schema is empty** — the `lib/db` package is scaffolded but has no tables defined yet
+4. **License secret is in client code** (`license.ts`) — the `LICENSE_SECRET` is embedded in the mobile app bundle, which means it can be extracted
+5. **No tests** anywhere in the project
+6. **OpenAPI spec is minimal** — only the health endpoint is defined; the admin API isn't spec'd
+
+---
+
+## Summary
+
+This is a **SaaS gym management app** targeting gym owners in Ethiopia (based on the admin email and `ETHIO-GYM` secret). The mobile app is the main product, the API server handles license code generation for the admin, and the shared libs are scaffolded for future API-driven features. The architecture is solid but the security of the licensing system and auth storage could use hardening.
+
+
+
+Let me read the main UI screens to understand the current interface.
+
+Now I have a complete picture of all the screens. Here's a full breakdown of the app's interface:
+
+---
+
+## App Interface Overview
+
+The app has a clean, modern design using a blue/white theme (`primary: #3B82F6`, `accent: #10B981`, `background: #F0F4FF`).
+
+---
+
+### Screen Flow
+
+```
+App Start
+  └── Loading spinner
+       ├── Not logged in → Login Screen
+       ├── Logged in, no subscription → Activate Screen
+       └── Logged in + active sub → Main Tabs
+```
+
+---
+
+### 1. Login Screen
+- Activity icon in a rounded blue box at the top
+- "Welcome Back" title + subtitle
+- Email + Password fields (with show/hide toggle 👁)
+- Error box with alert icon
+- Blue "Sign In" button
+- "Forgot password?" link
+- "Don't have an account? Register" footer
+
+### 2. Register Screen
+- Back arrow + "Create Account" header
+- Fields: Full Name, Gym Name, Phone, Email, Password (all with Amharic placeholders)
+- "Create Account" button
+
+### 3. Forgot Password Screen
+- Email + phone verification, then reset password
+
+### 4. Activate Screen
+- 🔑 icon header
+- Shows the gym's unique **Gym ID** in a large monospace card (e.g. `XQ8K2P`)
+- Activation code input (`GYM-XXXXXX-XXXXXX-XXXXXXXX` format)
+- "Activate" button
+- "💬 Contact Admin on Telegram" button (opens Telegram with pre-filled message)
+- "Sign out" link at the bottom
+
+---
+
+### 5. Members List (Main Tab)
+- Header: "Hello, [Name] 👋" + gym name + blue "+ Add" button
+- Subscription expiry warning banner (yellow/red) if ≤7 days left
+- **Stats row**: 4 colored pills — Total / Active / Expired / Unpaid
+- Search bar with clear button (Amharic placeholder)
+- Filter chips: All / Active / Expired / Unpaid
+- **Member cards** (FlatList):
+  - Avatar (photo or initials with color by membership type)
+  - Green/red status dot
+  - Name + membership type badge (color-coded: weekly=purple, monthly=blue, quarterly=green, yearly=amber)
+  - Phone number
+  - Expiry date with calendar icon
+  - Paid/Unpaid badge on the right
+- Empty state with "Add Member" button
+
+### 6. Add Member Screen (Modal)
+- Drag handle + nav bar with ✕ and "Save"
+- Photo section: Camera / Gallery buttons
+- Personal Info card: Name + Phone
+- Membership grid (2×2): Weekly / Monthly / Quarterly / Yearly
+- Expiry preview: "Expires: June 15, 2026"
+- Payment toggle (off by default) + amount input when toggled on
+
+### 7. Member Detail Screen
+- Hero section: avatar (photo or initials), name, membership badge, active/expired badge
+- "📩 Send Payment/Renewal Reminder (SMS)" button
+- Unpaid warning banner (if applicable)
+- "Record Payment" / "🔄 Renew Membership" button → expands to ETB amount input
+- Info cards: Membership Details, Contact Info, Payment Info, Notes
+- "Member since [date]" footer
+- 🗑 Delete button in top-right
+
+### 8. Settings Screen
+- Profile card: avatar initial, name, email, "🛡 Gym Owner" badge
+- Stats card: Total Members / Active Members / Total Revenue (ETB)
+- **Gym Information** section (editable: name, gym name, phone)
+- **Security** section (change password with show/hide toggles)
+- **Subscription** section: Gym ID, status, expiry date + "🔑 Enter/Renew Activation Code" button
+- **Data & Backup**: "📥 Download Members Spreadsheet" (exports CSV) — smart fingerprint check avoids duplicate exports
+- **Auto-Management** info boxes: auto-delete + SMS reminders
+- 🚪 "Sign Out" button (red, destructive style)
+
+---
+
+### Design System
+- **Colors**: Blue primary, green accent, red danger, amber warning, light blue-gray background
+- **Radius**: 12–16px rounded corners throughout
+- **Typography**: Bold headers, uppercase labels with letter-spacing
+- **Haptics**: Used on every meaningful interaction (tap, success, error)
+- **Language**: Mix of English UI + Amharic placeholders (targeting Ethiopian users)
+
+
+
+
+
+You need to push your local changes to the Replit project. Here's how:
+
+**Step 1 — Commit your changes locally**
+
+Open a terminal in your project root and run:
+
+```bash
+git add -A
+git commit -m "Fix screens: forgot password, edit member, activate guard, type errors"
+```
+
+**Step 2 — Push to Replit**
+
+Check what remotes you have:
+
+```bash
+git remote -v
+```
+
+If you see a Replit remote, push to it:
+
+```bash
+git push replit main
+```
+
+If you don't see a Replit remote, you need to add it. Go to your Replit project → click the three dots menu → **Connect to GitHub** or look for the Git panel to get the remote URL, then:
+
+```bash
+git remote add replit <your-replit-git-url>
+git push replit main
+```
+
+**Step 3 — Run on Replit**
+
+Once pushed, open your project on [replit.com](https://replit.com), and click the **Run** button at the top. Replit will start the Expo dev server with all the correct env vars and give you a URL to open the app in a browser or scan with Expo Go.
+
+---
+
+Alternatively, if your Replit project is already connected to a GitHub repo, just push to GitHub and Replit will sync automatically. Let me know what your `git remote -v` shows and I can give you the exact command.

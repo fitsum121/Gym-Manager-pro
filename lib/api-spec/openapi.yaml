@@ -1,0 +1,1003 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: Gym Manager API specification
+servers:
+  - url: /api
+    description: Base API path
+
+tags:
+  - name: health
+    description: Health operations
+  - name: auth
+    description: Owner authentication and account management
+  - name: members
+    description: Gym member management (requires authentication)
+  - name: staff
+    description: Staff management and authentication
+
+# ---------------------------------------------------------------------------
+# Security schemes
+# ---------------------------------------------------------------------------
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  # ---------------------------------------------------------------------------
+  # Reusable schemas
+  # ---------------------------------------------------------------------------
+  schemas:
+
+    # --- Shared ---
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+
+    OkResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+      required: [ok]
+
+    # --- Health ---
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required: [status]
+
+    # --- Owner ---
+    Owner:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        gymId:
+          type: string
+          example: W8ASYS
+        name:
+          type: string
+        gymName:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+          format: email
+      required: [id, gymId, name, gymName, phone, email]
+
+    RegisterOwnerRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        gymName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        phone:
+          type: string
+          default: ""
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+      required: [name, gymName, email, password]
+
+    LoginOwnerRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 1
+      required: [email, password]
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        owner:
+          $ref: "#/components/schemas/Owner"
+      required: [token, owner]
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        gymName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        phone:
+          type: string
+
+    ChangePasswordRequest:
+      type: object
+      properties:
+        currentPassword:
+          type: string
+          minLength: 1
+        newPassword:
+          type: string
+          minLength: 6
+      required: [currentPassword, newPassword]
+
+    VerifyIdentityRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          minLength: 1
+      required: [email, phone]
+
+    VerifyIdentityResponse:
+      type: object
+      properties:
+        verified:
+          type: boolean
+        resetToken:
+          type: string
+          description: Short-lived JWT (15 min) required by /auth/owner/reset-password. Only present when verified is true.
+      required: [verified]
+
+    ResetPasswordRequest:
+      type: object
+      properties:
+        resetToken:
+          type: string
+          minLength: 1
+          description: Token obtained from /auth/owner/verify-identity
+        newPassword:
+          type: string
+          minLength: 6
+      required: [resetToken, newPassword]
+
+    # --- Member ---
+    MembershipType:
+      type: string
+      enum: [weekly, monthly, quarterly, yearly]
+
+    Member:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        gymId:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        membershipType:
+          $ref: "#/components/schemas/MembershipType"
+        startDate:
+          type: string
+          format: date-time
+        expiryDate:
+          type: string
+          format: date-time
+        lastPaymentDate:
+          type: string
+          format: date-time
+          nullable: true
+        isPaid:
+          type: boolean
+        paymentAmount:
+          type: number
+          format: float
+        notes:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        [id, gymId, name, phone, email, membershipType, startDate, expiryDate,
+         lastPaymentDate, isPaid, paymentAmount, notes, createdAt, updatedAt]
+
+    CreateMemberRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        phone:
+          type: string
+          default: ""
+        email:
+          type: string
+          default: ""
+        membershipType:
+          $ref: "#/components/schemas/MembershipType"
+        startDate:
+          type: string
+          format: date-time
+        expiryDate:
+          type: string
+          format: date-time
+        lastPaymentDate:
+          type: string
+          format: date-time
+          nullable: true
+        isPaid:
+          type: boolean
+          default: false
+        paymentAmount:
+          type: number
+          minimum: 0
+          default: 0
+        notes:
+          type: string
+          default: ""
+      required: [name, membershipType, startDate, expiryDate]
+
+    UpdateMemberRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        phone:
+          type: string
+        email:
+          type: string
+        membershipType:
+          $ref: "#/components/schemas/MembershipType"
+        startDate:
+          type: string
+          format: date-time
+        expiryDate:
+          type: string
+          format: date-time
+        lastPaymentDate:
+          type: string
+          format: date-time
+          nullable: true
+        isPaid:
+          type: boolean
+        paymentAmount:
+          type: number
+          minimum: 0
+        notes:
+          type: string
+
+    RecordPaymentRequest:
+      type: object
+      properties:
+        amount:
+          type: number
+          exclusiveMinimum: 0
+      required: [amount]
+
+    MemberResponse:
+      type: object
+      properties:
+        member:
+          $ref: "#/components/schemas/Member"
+      required: [member]
+
+    MembersListResponse:
+      type: object
+      properties:
+        members:
+          type: array
+          items:
+            $ref: "#/components/schemas/Member"
+      required: [members]
+
+    # --- Staff ---
+    StaffMember:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        gymId:
+          type: string
+        name:
+          type: string
+        username:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, gymId, name, username, createdAt]
+
+    StaffLoginRequest:
+      type: object
+      properties:
+        gymId:
+          type: string
+          minLength: 1
+        username:
+          type: string
+          minLength: 1
+        pin:
+          type: string
+          minLength: 1
+      required: [gymId, username, pin]
+
+    StaffAuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        staff:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            gymId:
+              type: string
+            name:
+              type: string
+            role:
+              type: string
+              enum: [staff]
+          required: [id, gymId, name, role]
+      required: [token, staff]
+
+    CreateStaffRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        username:
+          type: string
+          minLength: 2
+          maxLength: 30
+          pattern: "^[a-z0-9_]+$"
+          description: Lowercase letters, numbers, and underscores only
+        pin:
+          type: string
+          pattern: "^\\d{4,6}$"
+          description: 4–6 numeric digits
+      required: [name, username, pin]
+
+    StaffListResponse:
+      type: object
+      properties:
+        staff:
+          type: array
+          items:
+            $ref: "#/components/schemas/StaffMember"
+      required: [staff]
+
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
+paths:
+
+  # --- Health ---
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  # --- Auth ---
+  /auth/owner/register:
+    post:
+      operationId: registerOwner
+      tags: [auth]
+      summary: Register a new gym owner
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterOwnerRequest"
+      responses:
+        "201":
+          description: Owner registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/owner/login:
+    post:
+      operationId: loginOwner
+      tags: [auth]
+      summary: Log in as a gym owner
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginOwnerRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/owner/me:
+    get:
+      operationId: getOwnerProfile
+      tags: [auth]
+      summary: Get the current owner's profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Owner profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Owner"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Owner not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/owner/profile:
+    patch:
+      operationId: updateOwnerProfile
+      tags: [auth]
+      summary: Update the current owner's profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Owner"
+        "400":
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/owner/change-password:
+    post:
+      operationId: changeOwnerPassword
+      tags: [auth]
+      summary: Change the current owner's password
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequest"
+      responses:
+        "200":
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: Validation failed or current password incorrect
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/owner/verify-identity:
+    post:
+      operationId: verifyOwnerIdentity
+      tags: [auth]
+      summary: Verify owner identity for password reset (step 1)
+      description: >
+        Checks email + phone combination. On success returns a short-lived
+        `resetToken` (15 min) that must be passed to `/auth/owner/reset-password`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyIdentityRequest"
+      responses:
+        "200":
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerifyIdentityResponse"
+        "400":
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /auth/owner/reset-password:
+    post:
+      operationId: resetOwnerPassword
+      tags: [auth]
+      summary: Reset owner password (step 2)
+      description: >
+        Requires the `resetToken` issued by `/auth/owner/verify-identity`.
+        The token expires after 15 minutes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResetPasswordRequest"
+      responses:
+        "200":
+          description: Password reset successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+        "400":
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Invalid or expired reset token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # --- Members ---
+  /members/cleanup:
+    post:
+      operationId: cleanupExpiredMembers
+      tags: [members]
+      summary: Delete members expired more than 7 days ago
+      description: >
+        Explicitly purges stale member records for the authenticated gym.
+        Should be called once on app startup. Kept separate from GET /members
+        so that listing members remains a pure read with no side effects.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Number of members deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted:
+                    type: integer
+                    description: Number of member records removed
+                required: [deleted]
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /members:
+    get:
+      operationId: listMembers
+      tags: [members]
+      summary: List all members for the authenticated gym
+      description: >
+        Also performs server-side cleanup: members whose expiry date is more
+        than 7 days in the past are automatically deleted before the list is returned.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of members
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MembersListResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    post:
+      operationId: createMember
+      tags: [members]
+      summary: Add a new member
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMemberRequest"
+      responses:
+        "201":
+          description: Member created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberResponse"
+        "400":
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /members/{memberId}:
+    parameters:
+      - name: memberId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    get:
+      operationId: getMember
+      tags: [members]
+      summary: Get a single member by ID
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Member found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Member not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    patch:
+      operationId: updateMember
+      tags: [members]
+      summary: Update a member's details
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMemberRequest"
+      responses:
+        "200":
+          description: Member updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberResponse"
+        "400":
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Member not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      operationId: deleteMember
+      tags: [members]
+      summary: Delete a member
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Member deleted
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Member not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /members/{memberId}/payment:
+    parameters:
+      - name: memberId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    post:
+      operationId: recordMemberPayment
+      tags: [members]
+      summary: Record a payment and extend membership
+      description: >
+        Marks the member as paid, records the payment amount and date, and
+        extends the expiry date by one membership period from the current expiry
+        (or from now if already expired).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordPaymentRequest"
+      responses:
+        "200":
+          description: Payment recorded, member updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberResponse"
+        "400":
+          description: Invalid amount
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Member not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # --- Staff ---
+  /staff/login:
+    post:
+      operationId: loginStaff
+      tags: [staff]
+      summary: Log in as a staff member
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StaffLoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffAuthResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /staff:
+    get:
+      operationId: listStaff
+      tags: [staff]
+      summary: List all staff for the authenticated gym (owner only)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of staff members
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffListResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Not authorised (owner role required)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    post:
+      operationId: createStaff
+      tags: [staff]
+      summary: Add a new staff member (owner only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStaffRequest"
+      responses:
+        "201":
+          description: Staff member created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffMember"
+        "400":
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Not authorised (owner role required)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Username already taken in this gym
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /staff/{staffId}:
+    parameters:
+      - name: staffId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    delete:
+      operationId: deleteStaff
+      tags: [staff]
+      summary: Remove a staff member (owner only)
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Staff member deleted
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Not authorised (owner role required)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Staff member not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
