@@ -7,7 +7,7 @@ services:
 
     # Build from the repo root so pnpm workspace packages resolve correctly
     rootDir: .
-    buildCommand: npm install -g pnpm && pnpm install --frozen-lockfile && pnpm --filter @workspace/api-server run build
+    buildCommand: npm install -g pnpm && pnpm install --ignore-scripts --frozen-lockfile && pnpm --filter @workspace/api-server run build
     startCommand: node artifacts/api-server/dist/index.cjs
 
     # Health check — Render uses this to know the service is up
@@ -29,5 +29,8 @@ services:
         sync: false
       - key: DATABASE_URL
         sync: false
+      # Comma-separated browser origins allowed in production.
+      # Example: https://admin.yourdomain.com
+      # Leave empty if you only use the mobile app (no browser clients).
       - key: ALLOWED_ORIGINS
         value: ""
